@@ -1,0 +1,275 @@
+---
+title: "Untitled"
+author: "Caitie"
+date: "2022-10-26"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(tmap)
+library(sf)
+library(patchwork)
+#library(rnaturalearth)
+#library(rnaturalearthdata)
+library(viridis)
+library(countrycode)
+
+```
+
+Circle bar plot with the bars colored by the trend and the bar height the 2013 chi value?
+
+1 for strict
+1 for not-strict
+
+```{r}
+cont<-read.csv(here("data/paper/Countries_by_continent.csv"))
+```
+
+```{r}
+iso3_chi<-read.csv(here("data/paper/Country_chi_results.csv")) %>% 
+  full_join(cont, by = c("rgn_key" = "ISO3")) %>% 
+  filter(year == 2009)
+
+iso3_trend<-read.csv(here("data/paper/Country_chi_trend_results.csv"))%>% 
+  full_join(cont, by = c("rgn_key" = "ISO3"))
+
+iso3_trend_strict<- iso3_trend %>% 
+  dplyr::select(rgn_key, Strict, Continent) %>% 
+  rename(Strict_trend = Strict)
+
+iso3_trend_not_strict<- iso3_trend %>% 
+  dplyr::select(rgn_key, Not_strict, Continent) %>% 
+  rename(Not_strict_trend = Not_strict)
+
+iso3_trend_other<- iso3_trend %>% 
+  dplyr::select(rgn_key, Other, Continent) %>% 
+  rename(Other_trend = Other)
+```
+
+```{r}
+iso3_hfp<-read.csv(here("data/paper/Country_hfp_results.csv")) %>% 
+  full_join(cont, by = c("rgn_key" = "ISO3")) %>% 
+  filter(year == 2009)
+
+iso3_hfp_trend<-read.csv(here("data/paper/Country_hfp_trend_results.csv"))%>% 
+  full_join(cont, by = c("rgn_key" = "ISO3"))
+
+iso3_hfp_trend_strict<- iso3_hfp_trend %>% 
+  dplyr::select(rgn_key, Strict, Continent) %>% 
+  rename(Strict_trend = Strict)
+
+iso3_hfp_trend_not_strict<- iso3_hfp_trend %>% 
+  dplyr::select(rgn_key, Not_strict, Continent) %>% 
+  rename(Not_strict_trend = Not_strict)
+
+iso3_hfp_trend_other<- iso3_hfp_trend %>% 
+  dplyr::select(rgn_key, Other, Continent) %>% 
+  rename(Other_trend = Other)
+```
+
+
+```{r}
+iso3_strict<-iso3_chi %>% 
+  dplyr::select(rgn_key, Strict) %>% 
+  full_join(iso3_trend_strict, by = "rgn_key") %>% 
+  rename(group = rgn_key,
+         value = Strict,
+         fill_val = Strict_trend) %>% 
+  mutate(cat = "Strict") %>% 
+  filter(!is.na(value) == T,
+         !is.na(fill_val) == T) #remove NAs
+
+iso3_non_strict<-iso3_chi %>% 
+  dplyr::select(rgn_key, Not_strict) %>% 
+  full_join(iso3_trend_not_strict, by = "rgn_key") %>% 
+  rename(group = rgn_key,
+         value = Not_strict,
+         fill_val = Not_strict_trend) %>% 
+  mutate(cat = "Multiple-use") %>% 
+  filter(!is.na(value) == T,
+         !is.na(fill_val) == T) #remove NAs
+
+iso3_other<-iso3_chi %>% 
+  dplyr::select(rgn_key, Other) %>% 
+  full_join(iso3_trend_other, by = "rgn_key") %>% 
+  rename(group = rgn_key,
+         value = Other,
+         fill_val = Other_trend) %>% 
+  mutate(cat = "Other") %>% 
+  filter(!is.na(value) == T,
+         !is.na(fill_val) == T) #remove NAs
+
+all<-rbind(iso3_strict, iso3_non_strict, iso3_other)
+```
+
+
+```{r}
+iso3_hfp_strict<-iso3_hfp %>% 
+  dplyr::select(rgn_key, Strict) %>% 
+  full_join(iso3_hfp_trend_strict, by = "rgn_key") %>% 
+  rename(group = rgn_key,
+         value = Strict,
+         fill_val = Strict_trend) %>% 
+  mutate(cat = "Strict") %>% 
+  filter(!is.na(value) == T,
+         !is.na(fill_val) == T) #remove NAs
+
+iso3_hfp_non_strict<-iso3_hfp %>% 
+  dplyr::select(rgn_key, Not_strict) %>% 
+  full_join(iso3_hfp_trend_not_strict, by = "rgn_key") %>% 
+  rename(group = rgn_key,
+         value = Not_strict,
+         fill_val = Not_strict_trend) %>% 
+  mutate(cat = "Multiple-use") %>% 
+  filter(!is.na(value) == T,
+         !is.na(fill_val) == T) #remove NAs
+
+iso3_hfp_other<-iso3_hfp %>% 
+  dplyr::select(rgn_key, Other) %>% 
+  full_join(iso3_hfp_trend_other, by = "rgn_key") %>% 
+  rename(group = rgn_key,
+         value = Other,
+         fill_val = Other_trend) %>% 
+  mutate(cat = "Other") %>% 
+  filter(!is.na(value) == T,
+         !is.na(fill_val) == T) #remove NAs
+
+all_hfp<-rbind(iso3_hfp_strict, iso3_hfp_non_strict, iso3_hfp_other)
+```
+
+# CHI Plot
+
+```{r}
+all<-all %>% 
+  mutate(Continent = ifelse(group == "ANT", "South America",
+                            ifelse(group == "TWN", "Asia", as.character(Continent))))
+
+all2<-all %>% 
+  filter(!is.na(Continent)) %>% 
+  mutate(Country = countrycode(group, "iso3c", "country.name"),
+         Country = ifelse(group == "ANT", "Netherlands Antilles", as.character(Country)))
+
+all2$cat <- factor(all2$cat, c("Strict", "Multiple-use", "Other"))
+```
+
+```{r}
+ggplot(all2, aes(y = value, x = group, fill = fill_val)) +
+  geom_bar(stat = "identity") +
+  facet_grid(cat~Continent, scale = "free_x") +
+  scale_fill_gradient2(low = "blue", mid = "grey", high = "red", midpoint = 0) +
+  theme_bw() +
+  ylab("CHI (2009)") +
+  xlab("Country") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "bottom") +
+  labs(fill = "Trend (2009-2013)") 
+```
+
+```{r}
+ggsave(here("figures/Country_CHI_trend_IUCN_final.png"), dpi = 600, width = 15, height = 6)
+```
+
+# HFP plot
+
+```{r}
+all_hfp2<-all_hfp %>% 
+  filter(!is.na(Continent)) %>% 
+  mutate(Country = countrycode(group, "iso3c", "country.name"),
+         Country = ifelse(group == "ANT", "Netherlands Antilles", as.character(Country)))
+
+all_hfp2$cat <- factor(all_hfp2$cat, c("Strict", "Multiple-use", "Other"))
+```
+
+```{r}
+ggplot(all_hfp2, aes(y = value, x = group, fill = fill_val)) +
+  geom_bar(stat = "identity") +
+  facet_grid(cat~Continent, scale = "free_x") +
+  scale_fill_gradient2(low = "blue", mid = "grey", high = "red", midpoint = 0) +
+  theme_bw() +
+  ylab("HFP (2009)") +
+  xlab("Country") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "bottom") +
+  labs(fill = "Trend (2009-2013)") 
+```
+
+```{r}
+ggsave(here("figures/Country_HFP_trend_IUCN_final.png"), dpi = 600, width = 15, height = 6)
+```
+
+
+# CHI results
+
+```{r}
+length(which(all2$cat == "Strict" & all2$fill_val>0))
+length(which(all2$cat == "Strict" & all2$fill_val<0))
+
+length(which(all2$cat == "Not strict" & all2$fill_val>0))
+length(which(all2$cat == "Not strict" & all2$fill_val<0))
+
+length(which(all2$cat == "Other" & all2$fill_val>0))
+length(which(all2$cat == "Other" & all2$fill_val<0))
+
+length(which(all2$fill_val>0))
+length(which(all2$fill_val<0))
+
+test<-all2 %>% 
+  filter(cat == "Strict")
+
+
+test2<-all2 %>% 
+  filter(cat == "Not strict")
+
+
+test3<-all2 %>% 
+  filter(cat == "Other")
+```
+
+
+```{r}
+mean(test$fill_val)
+mean(test2$fill_val)
+mean(test3$fill_val)
+```
+
+# HFP results
+```{r}
+length(which(all_hfp2$cat == "Strict" & all_hfp2$fill_val>0))
+length(which(all_hfp2$cat == "Strict" & all_hfp2$fill_val<0))
+
+length(which(all_hfp2$cat == "Not strict" & all_hfp2$fill_val>0))
+length(which(all_hfp2$cat == "Not strict" & all_hfp2$fill_val<0))
+
+length(which(all_hfp2$cat == "Other" & all_hfp2$fill_val>0))
+length(which(all_hfp2$cat == "Other" & all_hfp2$fill_val<0))
+
+length(which(all_hfp2$fill_val>0))
+length(which(all_hfp2$fill_val<0))
+
+test<-all_hfp2 %>% 
+  filter(cat == "Strict")
+
+
+test2<-all_hfp2 %>% 
+  filter(cat == "Not strict")
+
+
+test3<-all_hfp2 %>% 
+  filter(cat == "Other")
+```
+
+```{r}
+mean(test$fill_val)
+mean(test2$fill_val)
+mean(test3$fill_val)
+```
+
