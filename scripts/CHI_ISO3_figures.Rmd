@@ -159,6 +159,8 @@ all2<-all %>%
          Country = ifelse(group == "ANT", "Netherlands Antilles", as.character(Country)))
 
 all2$cat <- factor(all2$cat, c("Strict", "Multiple-use", "Other"))
+
+write.csv(all2, here("data/paper/CHI_figure_results.csv"))
 ```
 
 ```{r}
@@ -187,6 +189,9 @@ all_hfp2<-all_hfp %>%
          Country = ifelse(group == "ANT", "Netherlands Antilles", as.character(Country)))
 
 all_hfp2$cat <- factor(all_hfp2$cat, c("Strict", "Multiple-use", "Other"))
+
+write.csv(all_hfp2, here("data/paper/HFP_figure_results.csv"))
+
 ```
 
 ```{r}
